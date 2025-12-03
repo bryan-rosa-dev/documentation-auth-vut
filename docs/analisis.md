@@ -22,7 +22,7 @@ sequenceDiagram
     Backend->>Backend: Generar AT (15min) + RT (7d)
     Backend->>Backend: Almacenar RT en DB
 
-    Note over Backend,Frontend: Set-Cookie: accessToken=XXX; HttpOnly; Secure; SameSite=Strict<br/>Set-Cookie: refreshToken=YYY; HttpOnly; Secure; SameSite=Strict
+    Note over Backend,Frontend: Set-Cookie: accessToken=XXX<br/>HttpOnly, Secure, SameSite=Strict<br/><br/>Set-Cookie: refreshToken=YYY<br/>HttpOnly, Secure, SameSite=Strict
 
     Backend-->>Frontend: 200 OK + Cookies establecidas
     Frontend-->>Usuario: Redirigir a dashboard
@@ -48,7 +48,7 @@ sequenceDiagram
     BaseDatos-->>Backend: RT válido
 
     Backend->>Backend: Generar nuevo AT
-    Note over Backend,Frontend: Set-Cookie: accessToken=NEW_XXX; HttpOnly; Secure; SameSite=Strict
+    Note over Backend,Frontend: Set-Cookie: accessToken=NEW_XXX<br/>HttpOnly, Secure, SameSite=Strict
     Backend-->>Frontend: 200 OK + Nueva cookie AT
 
     Frontend->>Backend: Reintentar GET /api/protected
@@ -115,10 +115,10 @@ sequenceDiagram
     Backend->>Backend: Generar AT (15min) + RT (7d)
     Backend->>BaseDatos: Almacenar RT en DB
 
-    Note over Backend,Frontend: Set-Cookie: refreshToken=YYY; HttpOnly; Secure; SameSite=Strict
+    Note over Backend,Frontend: Set-Cookie: refreshToken=YYY<br/>HttpOnly, Secure, SameSite=Strict
 
     Backend-->>Frontend: 200 OK<br/>{accessToken: "XXX", expiresIn: 900}
-    Frontend->>Memoria: Almacenar AT en variable/localStorage
+    Frontend->>Memoria: Almacenar AT en variable
     Frontend-->>Usuario: Redirigir a dashboard
 
     Note over Frontend,Backend: === Petición a Recurso Protegido ===
@@ -179,7 +179,7 @@ sequenceDiagram
 **⚠️ Vulnerabilidades y Mitigaciones**
 
 1. **XSS (Cross-Site Scripting)**:
-   - **Riesgo**: Script malicioso puede leer AT desde localStorage/memoria
+   - **Riesgo**: Script malicioso puede leer AT desde memoria
    - **Impacto**: Acceso durante 15 minutos hasta expiración
    - **Mitigaciones críticas**:
      ```javascript
@@ -304,7 +304,7 @@ AT en header no se envía automáticamente. RT protegido por SameSite.
 
 | Vector de Ataque | Estrategia 1 (Dual HTTPOnly) | Estrategia 2 (Híbrido) |
 |------------------|------------------------------|------------------------|
-| **XSS (Cross-Site Scripting)** | <span class="security-badge high">✅ INMUNE</span><br/>Tokens inaccesibles por HTTPOnly | <span class="security-badge medium">⚠️ VENTANA 15MIN</span><br/>AT expuesto en memoria/localStorage |
+| **XSS (Cross-Site Scripting)** | <span class="security-badge high">✅ INMUNE</span><br/>Tokens inaccesibles por HTTPOnly | <span class="security-badge medium">⚠️ VENTANA 15MIN</span><br/>AT expuesto en memoria|
 | **CSRF (Cross-Site Request Forgery)** | <span class="security-badge medium">⚠️ REQUIERE PROTECCIÓN</span><br/>SameSite + CSRF tokens necesarios | <span class="security-badge high">✅ RESISTENTE</span><br/>AT en header no se envía automáticamente |
 | **Token Theft (Network Sniffing)** | <span class="security-badge high">✅ SOLO HTTPS</span><br/>MITM solo con certificado comprometido | <span class="security-badge medium">⚠️ DEVTOOLS</span><br/>AT visible en Network/Application tabs |
 | **Session Fixation** | <span class="security-badge high">✅ MITIGADO</span><br/>Flags Secure + regeneración de tokens | <span class="security-badge high">✅ MITIGADO</span><br/>Flags Secure + regeneración de tokens |
