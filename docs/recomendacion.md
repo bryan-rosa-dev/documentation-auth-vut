@@ -41,7 +41,7 @@
 
 ## Plan de Implementación Recomendado
 
-### Fase 1: Fundamentos (Semana 1-2)
+### Fase 1: Fundamentos 
 
 <div class="info-box">
 
@@ -213,7 +213,7 @@ export const requireAuth = (req, res, next) => {
 
 </div>
 
-### Fase 2: Frontend (Semana 2-3)
+### Fase 2: Frontend 
 
 <div class="info-box">
 
@@ -423,7 +423,7 @@ export const Login = () => {
 
 </div>
 
-### Fase 3: Seguridad (Semana 3-4)
+### Fase 3: Seguridad 
 
 <div class="info-box danger">
 
