@@ -48,167 +48,477 @@
 #### Backend: Endpoints de Autenticación
 
 ```javascript
-// auth.controller.js
-import jwt from 'jsonwebtoken';
-import { hash, compare } from 'bcrypt';
+// auth.service.js
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { RedisAuthService } from './infra/cache/redis-auth.service';
+import { UsersService } from '../users/users.service';
+import type { IPasswordHasher } from './domain/ports/password-hasher.port';
+import { AUTH_PORTS } from './domain/ports/tokens';
+import { UserAuthRecord, UserRecord } from '../users/domain/models/users.type';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
+import { CustomJwtPayload } from '@modules/jwt/domain/models/payload.type';
+import {
+  SingleTokenIssue,
+  TokenPair,
+} from '@modules/jwt/domain/models/token-issuer.type';
+import { SessionsService } from './sessions.service';
+import {
+  formatDate,
+  parseDate,
+} from 'src/libs/shared-helpers/parse-date.helper';
+import { JwtCustomService } from '@modules/jwt/jwt.service';
 
-export const login = async (req, res) => {
-  const { email, password } = req.body;
+@Injectable()
+export class AuthService {
+  constructor(
+    @Inject(AUTH_PORTS.PasswordHasher) private readonly hasher: IPasswordHasher,
+    private readonly tokenService: JwtCustomService,
+    private readonly cache: RedisAuthService,
+    private readonly usersService: UsersService,
+    private readonly cfg: ConfigService,
+    private readonly sessionsService: SessionsService,
+  ) {}
 
-  // 1. Validar credenciales
-  const user = await User.findOne({ email });
-  if (!user || !(await compare(password, user.passwordHash))) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
+  async authUser(data: {
+    dni: string;
+    password: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
+    const errorMessage = 'Invalid credentials';
+    const user = (await this.usersService.findByDni(
+      data.dni,
+      true,
+    )) as UserAuthRecord;
+
+    if (!user) throw new UnauthorizedException(errorMessage);
+
+    const ok = await this.hasher.compare(data.password, user.password);
+
+    if (!ok) throw new UnauthorizedException(errorMessage);
+
+    const twoFactorEnabled = this.cfg.get<boolean>('APP_2FA_REQUIRED') || false;
+    const twoFactorUserEnabled = user?.mfaEnabled || false;
+
+    if (twoFactorEnabled && twoFactorUserEnabled) {
+      return await this.mfaLogin(user);
+    }
+
+    return await this.login(user, data.ipAddress, data.userAgent);
   }
 
-  // 2. Generar tokens
-  const accessToken = jwt.sign(
-    { userId: user.id, email: user.email },
-    process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: '15m' }
-  );
+  private async login(
+    user: UserAuthRecord,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const sid = randomUUID();
 
-  const refreshToken = jwt.sign(
-    { userId: user.id, tokenVersion: user.tokenVersion },
-    process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: '7d' }
-  );
+    const pair: TokenPair = await this.generateTokens(user, sid);
 
-  // 3. Almacenar RT en DB
-  await RefreshToken.create({
-    userId: user.id,
-    token: refreshToken,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  });
+    const rtHashed = await this.hasher.hash(pair.refresh_token);
 
-  // 4. Establecer cookie HTTPOnly para RT
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // HTTPS only en prod
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/auth/refresh'
-  });
+    await this.sessionsService.createSession(
+      sid,
+      pair.refresh_jti,
+      user.id,
+      pair.refresh_expires_at,
+      ipAddress,
+      userAgent,
+      rtHashed,
+    );
 
-  // 5. Retornar AT en body
-  res.json({
-    accessToken,
-    expiresIn: 900, // 15 minutos en segundos
-    user: {
-      id: user.id,
+    return pair;
+  }
+
+  private async generateTokens(
+    user: UserAuthRecord | UserRecord,
+    sid: string,
+  ): Promise<TokenPair> {
+    const payload: CustomJwtPayload = {
+      sub: String(user.id),
       email: user.email,
-      name: user.name
-    }
-  });
-};
+      sid: sid,
+      dni: user.dni,
+      jti: randomUUID(),
+      purpose: 'at',
+    };
 
-export const refresh = async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
+    const pair: TokenPair = await this.tokenService.issueAuthTokens(payload);
 
-  if (!refreshToken) {
-    return res.status(401).json({ error: 'Refresh token no proporcionado' });
+    if (!pair) throw new UnauthorizedException('Token generation failed');
+
+    return pair;
   }
 
-  try {
-    // 1. Verificar token
-    const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+  async logout(data: CustomJwtPayload) {
+    if (data.jti && data.exp) {
+      const ttlSec = Math.max(1, data.exp - Math.floor(Date.now() / 1000));
 
-    // 2. Validar en DB (no revocado)
-    const tokenExists = await RefreshToken.findOne({
-      userId: payload.userId,
-      token: refreshToken,
-      expiresAt: { $gt: new Date() }
-    });
-
-    if (!tokenExists) {
-      return res.status(401).json({ error: 'Refresh token inválido o revocado' });
+      await this.cache.blacklistToken('RT', data.jti, ttlSec);
     }
 
-    // 3. Verificar token version (permite invalidar todos los tokens del usuario)
-    const user = await User.findById(payload.userId);
-    if (user.tokenVersion !== payload.tokenVersion) {
-      return res.status(401).json({ error: 'Token version inválida' });
+    if (data.sid && isNaN(data.sid as any)) {
+      await this.sessionsService.closeSession(data.sid, Number(data.sub));
     }
 
-    // 4. Generar nuevo AT
-    const accessToken = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '15m' }
+    return { ok: true };
+  }
+
+  async rotate(data: CustomJwtPayload) {
+    const errorMessage = 'Unauthorized refresh token';
+    if (!data.rt) throw new UnauthorizedException(errorMessage);
+
+    if (!data.jti) throw new UnauthorizedException(errorMessage);
+
+    const blacklisted = await this.cache.isBlacklisted('RT', data.jti);
+    if (blacklisted) throw new UnauthorizedException(errorMessage);
+
+    const session = await this.sessionsService.getSessionById(
+      data.sid!,
+      Number(data.sub),
+      true,
     );
 
-    // 5. (Opcional) Rotar RT para mayor seguridad
-    const newRefreshToken = jwt.sign(
-      { userId: user.id, tokenVersion: user.tokenVersion },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: '7d' }
+    if (!session) throw new UnauthorizedException(errorMessage);
+
+    const rtMatches = await this.hasher.compare(
+      data.rt,
+      session.hashedRt || '',
     );
 
-    // Eliminar RT viejo
-    await RefreshToken.deleteOne({ token: refreshToken });
+    if (!rtMatches) throw new UnauthorizedException(errorMessage);
 
-    // Crear RT nuevo
-    await RefreshToken.create({
-      userId: user.id,
-      token: newRefreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    });
+    const user = await this.usersService.findById(Number(data.sub));
 
-    // Establecer nuevo RT en cookie
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth/refresh'
-    });
+    if (!user) throw new UnauthorizedException(errorMessage);
 
-    res.json({
-      accessToken,
-      expiresIn: 900
-    });
-  } catch (error) {
-    return res.status(401).json({ error: 'Refresh token inválido' });
+    const pair: TokenPair = await this.generateTokens(user, data.sid!);
+
+    const rtHashed = await this.hasher.hash(pair.refresh_token);
+
+    await this.sessionsService.updateSession(
+      session.id,
+      pair.refresh_jti,
+      user.id,
+      pair.refresh_expires_at,
+      session.ip,
+      session.userAgent,
+      rtHashed,
+    );
+
+    const ttlSec = Math.max(1, data.exp! - Math.floor(Date.now() / 1000));
+    await this.cache.blacklistToken('RT', data.jti, ttlSec);
+
+    return pair;
   }
-};
+}
 
-export const logout = async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-
-  if (refreshToken) {
-    // Eliminar RT de DB
-    await RefreshToken.deleteOne({ token: refreshToken });
-  }
-
-  // Clear cookie
-  res.clearCookie('refreshToken', { path: '/auth/refresh' });
-  res.json({ message: 'Logout exitoso' });
-};
 ```
 
-#### Middleware de Autenticación
+#### TokenService
 
 ```javascript
-// auth.middleware.js
-import jwt from 'jsonwebtoken';
+//jwt.service.ts
+import { Inject, Injectable } from '@nestjs/common';
+import { createSecretKey, randomUUID } from 'crypto';
+import {
+  createRemoteJWKSet,
+  exportJWK,
+  importPKCS8,
+  importSPKI,
+  jwtVerify,
+  SignJWT,
+  type JWTPayload,
+} from 'jose';
+import {
+  IssuerJwksConfig,
+  RsaKeyEntry,
+  type SecretManager,
+} from '@modules/secrets/secret-manager.interface';
+import { SECRET_MANAGER } from '@modules/secrets/secret-manager.module';
+import type { CustomJwtPayload } from './domain/models/payload.type';
+import { toSeconds } from 'src/libs/shared-helpers/string-to-seconds.helper';
+import { SingleTokenIssue, TokenPair } from './domain/models/token-issuer.type';
 
-export const requireAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+@Injectable()
+export class JwtCustomService {
+  private rsaKeyCache = new Map<
+    string,
+    { privateKey: CryptoKey; publicKey: CryptoKey }
+  >();
+  private jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Access token no proporcionado' });
+  constructor(
+    @Inject(SECRET_MANAGER) private readonly secretManager: SecretManager,
+  ) {}
+
+  async signWithRsa(
+    alias: string,
+    payload: CustomJwtPayload,
+    options?: {
+      expiresIn?: string | number;
+      issuer?: string;
+      audience?: string | string[];
+      keyId?: string;
+      algorithm?: 'RS256' | 'RS384' | 'RS512';
+    },
+  ): Promise<SingleTokenIssue> {
+    const entry = await this.getRsaEntry(alias);
+    const keys = await this.getRsaKeys(alias, entry);
+    const alg = options?.algorithm ?? 'RS256';
+    const exp = this.resolveExpiration(options?.expiresIn, payload.exp, entry);
+    const issuer = options?.issuer ?? payload.iss ?? entry.iss;
+    const audience = options?.audience ?? payload.aud ?? entry.aud;
+    const kid = options?.keyId ?? entry.kid;
+
+    const signer = new SignJWT(payload as JWTPayload)
+      .setProtectedHeader({ alg, ...(kid ? { kid } : {}) })
+      .setIssuedAt()
+      .setSubject(String(payload.sub));
+
+    if (exp !== undefined) signer.setExpirationTime(exp);
+    if (issuer) signer.setIssuer(issuer);
+    if (audience) signer.setAudience(audience);
+
+    const token = await signer.sign(keys.privateKey);
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expires_at = exp ? new Date(exp * 1000) : new Date(0);
+    const expires_in = exp ? exp - nowSeconds : undefined;
+
+    return {
+      token,
+      expires_at: expires_at,
+      expires_in: expires_in,
+    };
   }
 
-  const token = authHeader.substring(7); // Remover "Bearer "
+  async issueAuthTokens(payload: CustomJwtPayload): Promise<TokenPair> {
+    const accessJti = randomUUID();
+    const refreshJti = randomUUID();
+    const access = await this.signWithRsa('at', {...payload,jti:accessJti});
+    const refresh = await this.signWithRsa('rt', {...payload,jti:refreshJti});
 
-  try {
-    const payload = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    req.user = payload; // Adjuntar datos del usuario al request
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Access token inválido o expirado' });
+    return {
+      token_type: 'Bearer',
+      access_token: access.token,
+      access_expires_at: access.expires_at,
+      access_expires_in: access.expires_in,
+      refresh_token: refresh.token,
+      refresh_expires_at: refresh.expires_at,
+      refresh_expires_in: refresh.expires_in,
+      access_jti: accessJti,
+      refresh_jti: refreshJti,
+    } as TokenPair;
   }
-};
+
+  async verifyWithRsa(
+    token: string,
+    alias: string,
+    options?: {
+      issuer?: string;
+      audience?: string | string[];
+      expectedKid?: string;
+    },
+  ): Promise<CustomJwtPayload> {
+    const entry = await this.getRsaEntry(alias);
+    const keys = await this.getRsaKeys(alias, entry);
+    const { payload, protectedHeader } = await jwtVerify(
+      token,
+      keys.publicKey,
+      {
+        issuer: options?.issuer ?? entry.iss,
+        audience: options?.audience ?? entry.aud,
+      },
+    );
+    this.assertKidMatch(entry.kid, protectedHeader.kid, `rsa:${alias}`);
+    this.assertKidMatch(
+      options?.expectedKid,
+      protectedHeader.kid,
+      `rsa:${alias}`,
+    );
+    return payload as CustomJwtPayload;
+  }
+
+  async verifyWithJwks(
+    token: string,
+    issuerAlias: string,
+    options?: {
+      issuer?: string;
+      audience?: string | string[];
+      expectedKid?: string;
+    },
+  ): Promise<CustomJwtPayload> {
+    const issuerMap = await this.secretManager.getIssuerMap();
+    const issuer = issuerMap[issuerAlias];
+    if (!issuer) {
+      throw new Error(`Issuer alias "${issuerAlias}" not found in issuer map`);
+    }
+
+    const jwks = this.getRemoteJwks(issuerAlias, issuer);
+    const { payload, protectedHeader } = await jwtVerify(token, jwks, {
+      issuer: options?.issuer ?? issuer.expectedIss,
+      audience: options?.audience ?? issuer.expectedAud,
+    });
+    this.assertKidMatch(
+      options?.expectedKid,
+      protectedHeader.kid,
+      `jwks:${issuerAlias}`,
+    );
+    return payload as CustomJwtPayload;
+  }
+
+  async getPublicJwks(): Promise<{ keys: Array<Record<string, unknown>> }> {
+    const map = await this.secretManager.getRsaKeyMap();
+    const keys: Array<Record<string, unknown>> = [];
+
+    for (const [alias, entry] of Object.entries(map)) {
+      if (!entry.exposeInJwks) continue;
+
+      const { publicKey } = await this.getRsaKeys(alias, entry);
+      const jwk = await exportJWK(publicKey);
+      keys.push({
+        ...jwk,
+        use: 'sig',
+        alg: 'RS256',
+        kid: entry.kid ?? alias,
+      });
+    }
+
+    return { keys };
+  }
+
+  private async getRsaEntry(alias: string): Promise<RsaKeyEntry> {
+    const map = await this.secretManager.getRsaKeyMap();
+    const entry = map[alias];
+    if (!entry) {
+      throw new Error(`RSA entry "${alias}" not found`);
+    }
+    return entry;
+  }
+
+  private async getRsaKeys(
+    alias: string,
+    entry: RsaKeyEntry,
+  ): Promise<{ privateKey: CryptoKey; publicKey: CryptoKey }> {
+    const cached = this.rsaKeyCache.get(alias);
+    if (cached) {
+      return cached;
+    }
+
+    const privateKey = await importPKCS8(entry.privateKey, 'RS256');
+    const publicKey = await importSPKI(entry.publicKey, 'RS256');
+    const result = { privateKey, publicKey };
+    this.rsaKeyCache.set(alias, result);
+    return result;
+  }
+
+  private getRemoteJwks(
+    alias: string,
+    issuer: IssuerJwksConfig,
+  ): ReturnType<typeof createRemoteJWKSet> {
+    const cached = this.jwksCache.get(alias);
+    if (cached) {
+      return cached;
+    }
+
+    const remote = createRemoteJWKSet(new URL(issuer.jwksUrl), {
+      cacheMaxAge: issuer.cacheTtlMs,
+    });
+    this.jwksCache.set(alias, remote);
+    return remote;
+  }
+
+  private resolveExpiration(
+    expiresIn: string | number | undefined,
+    absoluteExp: number | undefined,
+    source: HmacSecretConfig | RsaKeyEntry,
+  ): number | undefined {
+    if (absoluteExp !== undefined && expiresIn === undefined) {
+      return absoluteExp;
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    if ('expiresInSeconds' in source) {
+      const fallback = source.expiresInSeconds ?? 15 * 60;
+      const durationSeconds =
+        expiresIn === undefined ? fallback : toSeconds(expiresIn, fallback);
+      return nowSeconds + durationSeconds;
+    }
+
+    const fallback = toSeconds(source.expirationTime, 15 * 60);
+    const durationSeconds =
+      expiresIn === undefined ? fallback : toSeconds(expiresIn, fallback);
+    return nowSeconds + durationSeconds;
+  }
+
+  private assertKidMatch(
+    expectedKid: string | undefined,
+    actualKid: string | undefined,
+    context: string,
+  ): void {
+    if (!expectedKid) return;
+    if (!actualKid) {
+      throw new Error(
+        `Token is missing kid but "${context}" expects "${expectedKid}"`,
+      );
+    }
+    if (expectedKid !== actualKid) {
+      throw new Error(
+        `Token kid "${actualKid}" does not match expected "${expectedKid}" for ${context}`,
+      );
+    }
+  }
+}
+
+```
+
+#### Guard de Autenticación
+
+```javascript
+// access-token.guard.js
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { Request } from 'express';
+
+import { JwtCustomService } from '@modules/jwt/jwt.service';
+import type { CustomJwtPayload } from '@modules/jwt/domain/models/payload.type';
+
+@Injectable()
+export class AccessTokenGuard implements CanActivate {
+  constructor(private readonly jwt: JwtCustomService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<Request>();
+    const token = this.extractBearer(req);
+    if (!token) {
+      throw new UnauthorizedException('Missing access token');
+    }
+
+    try {
+      const payload = await this.jwt.verifyWithRsa(token, 'at');
+      (req as any).user = payload as CustomJwtPayload;
+      return true;
+    } catch (err) {
+      throw new UnauthorizedException('Invalid access token');
+    }
+  }
+
+  private extractBearer(req: Request): string | undefined {
+    const header = req.headers.authorization;
+    if (!header) return undefined;
+    const [scheme, value] = header.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !value) return undefined;
+    return value;
+  }
+}
 ```
 
 </div>
