@@ -157,14 +157,4 @@ Sugerencias y mejoras son bienvenidas:
 4. Push: `git push origin feature/mejora`
 5. Abre un Pull Request
 
-## 📝 Licencia
 
-MIT
-
-## 📧 Contacto
-
-Para preguntas o comentarios sobre el análisis técnico, abre un issue en este repositorio.
-
----
-
-**Nota**: Este documento es para fines educativos y de toma de decisiones técnicas. Siempre consulta con un experto en seguridad antes de implementar en producción.

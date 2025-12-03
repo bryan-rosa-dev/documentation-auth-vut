@@ -5,7 +5,7 @@ export default withMermaid(
   defineConfig({
     title: 'Análisis de Autenticación JWT',
     description: 'Análisis técnico de estrategias de autenticación JWT con diagramas interactivos',
-    base: '/documentacion-auth-vut/',
+    base: '/documentation-auth-vut/',
 
     themeConfig: {
       nav: [
