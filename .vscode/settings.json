@@ -1,0 +1,24 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true,
+    "**/.vitepress/cache": true,
+    "**/.vitepress/dist": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.vitepress/cache": true,
+    "**/.vitepress/dist": true,
+    "**/package-lock.json": true
+  },
+  "markdown.preview.breaks": true,
+  "markdown.preview.typographer": true,
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "comments": "on",
+      "strings": "on",
+      "other": "on"
+    }
+  }
+}

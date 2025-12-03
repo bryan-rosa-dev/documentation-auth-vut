@@ -1,0 +1,119 @@
+/* Variables de colores personalizados */
+:root {
+  --vp-c-brand: #3b82f6;
+  --vp-c-brand-light: #60a5fa;
+  --vp-c-brand-dark: #2563eb;
+  --vp-c-brand-darker: #1e40af;
+}
+
+/* Estilos para info boxes */
+.info-box {
+  padding: 1.5rem;
+  margin: 1rem 0;
+  border-left: 4px solid var(--vp-c-brand);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.info-box.success {
+  border-left-color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.info-box.warning {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.info-box.danger {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.info-box h4,
+.info-box h5,
+.info-box strong {
+  margin-top: 0;
+}
+
+.info-box > *:first-child {
+  margin-top: 0;
+}
+
+.info-box > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Security badges */
+.security-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.5rem 0;
+}
+
+.security-badge.high {
+  background: #10b981;
+  color: white;
+}
+
+.security-badge.medium {
+  background: #f59e0b;
+  color: white;
+}
+
+.security-badge.low {
+  background: #ef4444;
+  color: white;
+}
+
+/* Tablas responsivas */
+table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+
+/* Mejoras de Mermaid */
+.mermaid {
+  text-align: center;
+  margin: 2rem 0;
+}
+
+/* Estilos para código */
+.vp-code-group {
+  margin: 1.5rem 0;
+}
+
+/* Grid responsivo para comparaciones */
+@media (max-width: 768px) {
+  div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mejoras de contraste para modo oscuro */
+.dark .info-box {
+  background: rgba(100, 116, 139, 0.1);
+}
+
+.dark .info-box.success {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.dark .info-box.warning {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.dark .info-box.danger {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* Espaciado adicional para diagramas */
+.vp-doc div[class*="language-mermaid"] {
+  margin: 2rem 0;
+  background: transparent !important;
+}
