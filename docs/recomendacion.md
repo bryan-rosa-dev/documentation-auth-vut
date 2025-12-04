@@ -2,14 +2,14 @@
 
 ## Resumen Ejecutivo para Tomadores de Decisión
 
-<div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0;">
-  <h2 style="margin-top: 0; color: white;">🎯 Recomendación Principal</h2>
-  <h3 style="color: white;">Para la mayoría de aplicaciones web modernas: Estrategia 2 (Híbrido)</h3>
-  <p style="font-size: 1.1rem; margin-bottom: 0;">
-    <strong>Con la condición obligatoria</strong> de implementar Content Security Policy estricta y sanitización de inputs.
-    Si tu equipo no puede garantizar mitigación XSS robusta, opta por Estrategia 1.
-  </p>
-</div>
+:::tip 🎯 Recomendación Principal
+
+**Para la mayoría de aplicaciones web modernas: Estrategia 2 (Híbrido)**
+
+**Con la condición obligatoria** de implementar Content Security Policy estricta y sanitización de inputs.
+Si tu equipo no puede garantizar mitigación XSS robusta, opta por Estrategia 1.
+
+:::
 
 ---
 
@@ -41,11 +41,9 @@
 
 ## Plan de Implementación Recomendado
 
-### Fase 1: Fundamentos 
+### Fase 1: Fundamentos
 
-<div class="info-box">
-
-#### Backend: Endpoints de Autenticación
+:::details Ver código: Backend - Endpoints de Autenticación
 
 ```javascript
 // auth.service.js
@@ -217,7 +215,9 @@ export class AuthService {
 
 ```
 
-#### TokenService
+:::
+
+:::details Ver código: Backend - Token Service
 
 ```javascript
 //jwt.service.ts
@@ -476,7 +476,9 @@ export class JwtCustomService {
 
 ```
 
-#### Guard de Autenticación
+:::
+
+:::details Ver código: Backend - Guard de Autenticación
 
 ```javascript
 // access-token.guard.js
@@ -521,13 +523,11 @@ export class AccessTokenGuard implements CanActivate {
 }
 ```
 
-</div>
+:::
 
-### Fase 2: Frontend 
+### Fase 2: Frontend
 
-<div class="info-box">
-
-#### Servicio de Autenticación
+:::details Ver código: Frontend - Servicio de Autenticación
 
 ```javascript
 // authService.js
@@ -618,7 +618,9 @@ class AuthService {
 export const authService = new AuthService();
 ```
 
-#### HTTP Client con Interceptores (Axios)
+:::
+
+:::details Ver código: Frontend - HTTP Client con Interceptores (Axios)
 
 ```javascript
 // httpClient.js
@@ -676,7 +678,9 @@ httpClient.interceptors.response.use(
 export default httpClient;
 ```
 
-#### Componente de Login (React)
+:::
+
+:::details Ver código: Frontend - Componente de Login (React)
 
 ```jsx
 // Login.jsx
@@ -731,13 +735,11 @@ export const Login = () => {
 };
 ```
 
-</div>
+:::
 
-### Fase 3: Seguridad 
+### Fase 3: Seguridad
 
-<div class="info-box danger">
-
-#### Content Security Policy (CRÍTICO)
+:::details Ver código: Content Security Policy (CRÍTICO)
 
 ```javascript
 // Middleware en Express
@@ -761,7 +763,9 @@ app.use(
 );
 ```
 
-#### Sanitización de Inputs
+:::
+
+:::details Ver código: Sanitización de Inputs
 
 ```javascript
 // Usar DOMPurify en frontend
@@ -782,7 +786,9 @@ const sanitizeUserInput = (html) => {
 <div>{sanitizeUserInput(userContent)}</div>
 ```
 
-#### Headers de Seguridad Adicionales
+:::
+
+:::details Ver código: Headers de Seguridad Adicionales
 
 ```javascript
 app.use(helmet({
@@ -798,13 +804,11 @@ app.use(helmet({
 }));
 ```
 
-</div>
+:::
 
 ### Fase 4: Monitoreo y Auditoría (Continuo)
 
-<div class="info-box">
-
-#### Logging de Eventos de Seguridad
+:::details Ver código: Logging de Eventos de Seguridad
 
 ```javascript
 // logger.js
@@ -847,7 +851,9 @@ app.post('/auth/refresh', async (req, res) => {
 });
 ```
 
-#### Detección de Anomalías
+:::
+
+:::details Ver código: Detección de Anomalías y Rate Limiting
 
 ```javascript
 // rateLimit.js
@@ -869,13 +875,13 @@ app.post('/auth/refresh', rateLimit({
 }), refresh);
 ```
 
-</div>
+:::
 
 ---
 
 ## Checklist de Implementación
 
-### Backend
+:::details  Backend
 
 - [ ] Generar claves secretas robustas (`RSA`)
 - [ ] Configurar expiración de AT en 15 minutos
@@ -884,7 +890,7 @@ app.post('/auth/refresh', rateLimit({
 - [ ] Agregar `tokenVersion` a modelo de usuario para revocación global
 - [ ] Implementar rotación de RT en cada refresh
 - [ ] Configurar cookies con flags correctos (httpOnly, secure, sameSite)
-- [ ] Implementar middleware de autenticación
+- [ ] Implementar guards de autenticación
 - [ ] Agregar rate limiting en endpoints de auth
 - [ ] Configurar CORS correctamente
 - [ ] Implementar logging de eventos de seguridad
@@ -892,7 +898,9 @@ app.post('/auth/refresh', rateLimit({
 - [ ] Implementar CSP estricta
 - [ ] Job para limpiar RTs expirados de DB
 
-### Frontend
+:::
+
+:::details Frontend
 
 - [ ] Crear servicio de autenticación con métodos login/refresh/logout
 - [ ] Implementar almacenamiento seguro de AT (variable privada)
@@ -907,7 +915,9 @@ app.post('/auth/refresh', rateLimit({
 - [ ] Agregar manejo de errores de red
 - [ ] Implementar logout en todas las tabs simultáneamente
 
-### Testing
+:::
+
+:::details Testing
 
 - [ ] Test: Login exitoso
 - [ ] Test: Login con credenciales inválidas
@@ -924,7 +934,9 @@ app.post('/auth/refresh', rateLimit({
 - [ ] Test: Multi-tab logout sincronizado
 - [ ] Test de penetración (contratar auditoría externa)
 
-### Deployment
+:::
+
+:::details Deployment
 
 - [ ] Variables de entorno seguras (secrets en CI/CD)
 - [ ] HTTPS forzado en producción
@@ -935,13 +947,13 @@ app.post('/auth/refresh', rateLimit({
 - [ ] Documentación de runbook para revocación de tokens
 - [ ] Plan de respuesta a incidentes
 
+:::
+
 ---
 
 ## Plan B: Cuándo usar Estrategia 1
 
-<div class="info-box warning">
-
-### Cambia a Dual HTTPOnly si:
+:::warning ⚠️ Cambia a Dual HTTPOnly si:
 
 1. **Auditoría de Seguridad Falla**
    - Vulnerabilidades XSS encontradas y no mitigables
@@ -957,7 +969,11 @@ app.post('/auth/refresh', rateLimit({
    - No hay planes de microservicios
    - No requiere mobile app nativa
 
+:::
+
 ### Migración de Estrategia 2 a Estrategia 1
+
+:::details 🔄 Ver código: Migración a Estrategia 1 (Dual HTTPOnly)
 
 ```javascript
 // Cambiar backend para enviar AT en cookie también
@@ -990,7 +1006,7 @@ const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
 ```
 
-</div>
+:::
 
 ---
 
@@ -1012,9 +1028,7 @@ Después de implementación, monitorear:
 
 ## Conclusión Final
 
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0;">
-
-### 🎯 Decisión Recomendada
+:::tip 🎯 Decisión Recomendada
 
 **Implementar Estrategia 2 (Híbrido)** con las siguientes condiciones:
 
@@ -1026,19 +1040,13 @@ Después de implementación, monitorear:
 6. ✅ Logging y monitoreo de eventos de seguridad
 7. ✅ Auditorías de seguridad periódicas
 
-### ⚠️ Migrar a Estrategia 1 si:
+**⚠️ Migrar a Estrategia 1 si:**
 
 - Auditoría encuentra vulnerabilidades XSS no mitigables
 - Regulaciones requieren máxima seguridad
 - Equipo no puede mantener CSP y sanitización
 
-### 📈 Roadmap Post-Implementación
-
-**Mes 1-3**: Monitoreo intensivo, ajustes basados en logs
-**Mes 3-6**: Auditoría de seguridad externa
-**Mes 6+**: Evaluación de migración a OAuth 2.1 o WebAuthn
-
-</div>
+:::
 
 ---
 
@@ -1056,9 +1064,5 @@ Después de implementación, monitorear:
 - **Monitoreo**: Sentry, LogRocket, Datadog
 - **Testing**: Jest, Cypress, Postman
 
-### Comunidad y Soporte
 
-- Stack Overflow: [jwt] [authentication] tags
-- Reddit: r/webdev, r/netsec
-- Discord: The Programmer's Hangout, Reactiflux
 
