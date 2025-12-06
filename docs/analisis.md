@@ -174,7 +174,7 @@ sequenceDiagram
 
 </div>
 
-<div class="info-box danger">
+<div class="info-box warning">
 
 **⚠️ Vulnerabilidades y Mitigaciones**
 

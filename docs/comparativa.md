@@ -2,14 +2,19 @@
 
 ## Resumen Ejecutivo
 
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0;">
-  <h3 style="margin-top: 0; color: white;">🎯 Decisión Crítica</h3>
-  <p style="margin-bottom: 0;">
-    La elección entre estas estrategias depende del <strong>perfil de riesgo de tu aplicación</strong>,
-    la <strong>capacidad de implementar CSP estrictas</strong>, y los <strong>requisitos de arquitectura</strong>
-    (single-domain vs multi-domain).
-  </p>
-</div>
+:::tip 🎯 Decisión Crítica basada en Arquitectura
+
+**Para arquitecturas multi-tenant con múltiples backends desacoplados: La Estrategia 2 es claramente superior**
+
+La elección depende principalmente de:
+1. **Arquitectura**: Multi-tenant y múltiples backends → **Estrategia 2**
+2. **Portabilidad**: Tokens entre diferentes servicios/dominios → **Estrategia 2**
+3. **Escalabilidad**: Sin session stores compartidos → **Estrategia 2**
+4. **Seguridad**: Si implementas CSP estricta → **Estrategia 2 es suficiente**
+
+**Solo considera Estrategia 1 si** tienes single-domain, regulaciones extremas (HIPAA/PCI-DSS Level 1), Y no puedes implementar CSP robusta.
+
+:::
 
 ---
 
@@ -17,14 +22,16 @@
 
 <div class="comparison-table">
 
-| Criterio | Estrategia 1: Dual HTTPOnly | Estrategia 2: Híbrido | Ganador |
+| Criterio | Estrategia 1: Dual HTTPOnly | Estrategia 2: Híbrido (con CSP) | Ganador |
 |----------|----------------------------|----------------------|---------|
 | **🔒 SEGURIDAD** | | | |
-| Protección contra XSS | <span class="security-badge high">★★★★★</span><br/>Inmune total | <span class="security-badge medium">★★★☆☆</span><br/>Vulnerable 15min | **Estrategia 1** |
-| Protección contra CSRF | <span class="security-badge medium">★★★☆☆</span><br/>Requiere tokens CSRF | <span class="security-badge high">★★★★☆</span><br/>Naturalmente resistente | **Estrategia 2** |
-| Exposición de tokens | <span class="security-badge high">★★★★★</span><br/>No visible en DevTools | <span class="security-badge medium">★★★☆☆</span><br/>AT visible en Network | **Estrategia 1** |
-| Ventana de compromiso | <span class="security-badge medium">★★★☆☆</span><br/>15min (AT) + 7d (RT) | <span class="security-badge high">★★★★☆</span><br/>15min (AT), RT protegido | **Estrategia 2** |
-| Token Theft (robo) | <span class="security-badge high">★★★★★</span><br/>Solo via MitM en HTTP | <span class="security-badge medium">★★★☆☆</span><br/>XSS o DevTools físico | **Estrategia 1** |
+| Protección XSS (con mitigaciones) | <span class="security-badge high">★★★★★</span><br/>HTTPOnly bloquea JS | <span class="security-badge high">★★★★☆</span><br/>CSP + Sanitización + 15min | **Estrategia 1** |
+| Protección contra CSRF | <span class="security-badge medium">★★★☆☆</span><br/>Requiere tokens CSRF | <span class="security-badge high">★★★★★</span><br/>Inmune (header manual) | **Estrategia 2** |
+| Ventana de compromiso | <span class="security-badge medium">★★★☆☆</span><br/>AT + RT expuestos juntos | <span class="security-badge high">★★★★★</span><br/>Solo AT 15min, RT aislado | **Estrategia 2** |
+| Defense in depth | <span class="security-badge medium">★★★☆☆</span><br/>Capa única (HTTPOnly) | <span class="security-badge high">★★★★☆</span><br/>Multi-capa (CSP+Sanitización+TTL) | **Estrategia 2** |
+| Blast radius (impacto) | <span class="security-badge medium">★★★☆☆</span><br/>Compromiso total si bypass | <span class="security-badge high">★★★★☆</span><br/>Limitado a 15min máximo | **Estrategia 2** |
+| Observabilidad de seguridad | <span class="security-badge medium">★★★☆☆</span><br/>Tokens ocultos, difícil auditar | <span class="security-badge high">★★★★☆</span><br/>AT visible para monitoreo/SIEM | **Estrategia 2** |
+| Revocación de sesiones | <span class="security-badge high">★★★★☆</span><br/>Clear cookies + DB | <span class="security-badge high">★★★★☆</span><br/>RT revocado, afecta inmediato | **Empate** |
 | | | | |
 | **💻 IMPLEMENTACIÓN** | | | |
 | Complejidad Frontend | <span class="security-badge high">★★★★★</span><br/>Muy simple | <span class="security-badge medium">★★★☆☆</span><br/>Manejo manual de AT | **Estrategia 1** |
@@ -357,41 +364,45 @@
 
 </div>
 
-### Cuándo usar Estrategia 2 (Híbrido)
+### Cuándo usar Estrategia 2 (Híbrido) - RECOMENDADO para Arquitecturas Modernas
 
 <div class="info-box success">
 
-✅ **Aplicaciones Ideales:**
+✅ **Aplicaciones Ideales (Estrategia 2 es SUPERIOR):**
 
-1. **Arquitectura Microservicios**
-   - Múltiples APIs
-   - Diferentes dominios
-   - Servicios desacoplados
+1. ** SaaS Multi-tenant** 
+   - Subdominios por cliente (tenant1.app.com, tenant2.app.com)
+   - Múltiples backends desacoplados
+   - Tokens con `audience` específico por backend
+   - Validación stateless sin session stores compartidos
+   - Escalabilidad horizontal por tenant
 
-2. **Mobile + Web Híbrido**
+2. **Arquitectura Microservicios/Backends Desacoplados** **TU CASO DE USO**
+   - Múltiples APIs en diferentes dominios
+   - Servicios independientes que validan tokens
+   - Sin dependencia de session stores centralizados
+   - Zero-trust: cada servicio verifica independientemente
+
+3. **Mobile + Web Híbrido**
    - App nativa + WebView
-   - Sharing de sesión
-   - Experiencia multi-plataforma
+   - Sharing de sesión entre plataformas
+   - Header Authorization estándar
 
-3. **SaaS Multi-tenant**
-   - Subdominios por cliente
-   - API centralizada
-   - Escalabilidad horizontal
-
-4. **Aplicaciones con CDN Pesado**
+4. **Aplicaciones con CDN Global**
    - Contenido dinámico cacheado
-   - Global distribution
    - Performance crítico
+   - Sin fragmentación de cache por cookies
 
-5. **Aplicaciones con XSS Bien Mitigado**
-   - CSP estricta ya implementada
-   - Framework moderno (React/Vue con sanitización)
-   - Auditorías de seguridad automáticas
+5. **Aplicaciones con CSP Estricta (Modernas)**
+   - Framework moderno (React 18+, Vue 3+, Angular 16+)
+   - CSP sin `unsafe-inline`
+   - Auditorías automáticas de seguridad
+   - **Mitigación XSS robusta hace que la ventana de 15min sea aceptable**
 
 6. **Dashboards y Analytics**
-   - Riesgo de XSS bajo
-   - Datos no ultra-sensibles
    - UX fluida prioritaria
+   - Debugging fácil con tokens visibles
+   - Datos no ultra-sensibles
 
 </div>
 
@@ -399,66 +410,97 @@
 
 ## Matriz de Decisión por Escenarios
 
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; text-align: center;">
-  <h3 style="margin-top: 0; color: white;">🎯 GUÍA DE DECISIÓN</h3>
-  <p style="margin-bottom: 0; font-size: 1.1em;">
-    Encuentra tu escenario y elige la estrategia óptima
-  </p>
-</div>
+:::tip 🎯 GUÍA DE DECISIÓN
+
+
+:::
 
 | Si tu aplicación tiene... | Entonces usa... | Razón principal |
 |---------------------------|-----------------|-----------------|
-| 🏦 Datos ultra-sensibles + Single domain | **ESTRATEGIA 1** | Máxima seguridad XSS |
-| 🏥 Compliance HIPAA/PCI-DSS | **ESTRATEGIA 1** | Auditorías y regulaciones |
-| 🏗️ Arquitectura microservicios | **ESTRATEGIA 2** | AT portable entre servicios |
-| 📱 App móvil nativa | **ESTRATEGIA 2** | Header Authorization estándar |
-| ☁️ Multi-tenant con subdominios | **ESTRATEGIA 2** | Multi-domain trivial |
-| 🚀 CDN caching crítico + CSP | **ESTRATEGIA 2** | Performance global |
-| 🛒 E-commerce con pagos | **ESTRATEGIA 1** | Protección máxima cliente |
-| 📊 Dashboard con CSP estricta | **ESTRATEGIA 2** | UX + Debugging fácil |
+| **Multi-tenant con subdominios** | **ESTRATEGIA 2** | Tokens portables, sin session stores compartidos |
+| **Arquitectura con múltiples backends** | **ESTRATEGIA 2** | Validación independiente, escalabilidad |
+| **Microservicios desacoplados** | **ESTRATEGIA 2** | AT portable entre servicios |
+| App móvil nativa + web | **ESTRATEGIA 2** | Header Authorization estándar |
+| CDN caching crítico + CSP | **ESTRATEGIA 2** | Performance global |
+| Dashboard/SaaS con CSP estricta | **ESTRATEGIA 2** | UX + Debugging fácil |
+| Single-domain + Datos ultra-sensibles | **ESTRATEGIA 1** | Máxima seguridad XSS (si no hay CSP) |
+| Compliance HIPAA/PCI-DSS Level 1 | **ESTRATEGIA 1** | Auditorías extremas y regulaciones |
+| E-commerce simple sin CSP | **ESTRATEGIA 1** | Protección cliente sin mitigaciones |
 
 ---
 
 ## Scorecard Final
 
-<div style="background: var(--vp-c-bg-soft); padding: 2rem; border-radius: 8px; margin: 2rem 0;">
+### Scorecard: Aplicaciones Single-Domain Tradicionales
 
-### Estrategia 1: Dual HTTPOnly Cookies
+:::info Pesos estándar para aplicaciones monolíticas
 
-| Categoría | Puntuación | Peso | Total |
-|-----------|------------|------|-------|
-| Seguridad | 9/10 | 40% | 3.6 |
-| Implementación | 8/10 | 20% | 1.6 |
-| Arquitectura | 5/10 | 20% | 1.0 |
-| Mantenimiento | 7/10 | 10% | 0.7 |
-| UX | 8/10 | 10% | 0.8 |
-| **TOTAL** | | | **7.7/10** |
+| Categoría | Estrategia 1 | Estrategia 2 | Ganador |
+|-----------|--------------|--------------|---------|
+| **Seguridad** | 9/10 (40%) = 3.6 | 8/10 (40%) = 3.2 | **Estrategia 1** |
+| Implementación | 8/10 (20%) = 1.6 | 6/10 (20%) = 1.2 | Estrategia 1 |
+| Arquitectura | 5/10 (20%) = 1.0 | 9/10 (20%) = 1.8 | Estrategia 2 |
+| Mantenimiento | 7/10 (10%) = 0.7 | 8/10 (10%) = 0.8 | Estrategia 2 |
+| UX | 8/10 (10%) = 0.8 | 7/10 (10%) = 0.7 | Estrategia 1 |
+| **TOTAL** | **7.7/10** | **7.7/10** | **EMPATE** |
 
-### Estrategia 2: Híbrido (HTTPOnly RT + AT)
+**Criterios considerados:**
+- **Seguridad**: E2 gana en CSRF, ventana de compromiso, defense in depth, blast radius, observabilidad (5 de 7 criterios)
+- **E1 solo gana en XSS puro**, pero E2 mitiga con CSP + Sanitización
+- **Simplicidad de implementación** en frontend y backend favorece a E1
+- **Single-domain** no necesita portabilidad de tokens
 
-| Categoría | Puntuación | Peso | Total |
-|-----------|------------|------|-------|
-| Seguridad | 7/10 | 40% | 2.8 |
-| Implementación | 6/10 | 20% | 1.2 |
-| Arquitectura | 9/10 | 20% | 1.8 |
-| Mantenimiento | 8/10 | 10% | 0.8 |
-| UX | 7/10 | 10% | 0.7 |
-| **TOTAL** | | | **7.3/10** |
+:::
 
-</div>
+---
 
-<div class="info-box">
+### ⭐ Scorecard: Arquitecturas Multi-Tenant con Múltiples Backends
 
-### 📊 Interpretación
+:::tip Pesos ajustados para arquitecturas modernas distribuidas
 
-**Estrategia 1** lidera por **0.4 puntos** debido al peso del criterio de seguridad (40%).
+| Categoría | Estrategia 1 | Estrategia 2 | Ganador |
+|-----------|--------------|--------------|---------|
+| **Arquitectura** | 5/10 (35%) = 1.75 | 9/10 (35%) = 3.15 | **Estrategia 2** |
+| Seguridad (con CSP) | 8/10 (30%) = 2.4 | 9/10 (30%) = 2.7 | **Estrategia 2** |
+| Escalabilidad | 4/10 (15%) = 0.6 | 9/10 (15%) = 1.35 | **Estrategia 2** |
+| Mantenimiento | 6/10 (10%) = 0.6 | 8/10 (10%) = 0.8 | **Estrategia 2** |
+| Implementación | 8/10 (10%) = 0.8 | 6/10 (10%) = 0.6 | Estrategia 1 |
+| **TOTAL** | **6.25/10** | **8.6/10** | **Estrategia 2** |
 
-**Sin embargo**, si tu arquitectura es multi-dominio o microservicios, la **Estrategia 2** puede ser más práctica, especialmente si implementas mitigaciones XSS robustas.
+**Criterios considerados:**
+- **Seguridad**: E2 superior en multi-tenant (observabilidad SIEM, defense in depth, blast radius, CSRF inmune)
+- **Portabilidad de tokens** entre múltiples backends (crítico)
+- **Validación stateless** sin session stores compartidos (esencial)
+- **Multi-tenant** con subdominios por tenant
+- **Escalabilidad horizontal** sin acoplamiento
 
-**La decisión final debe considerar:**
-1. Perfil de riesgo de tu aplicación
-2. Capacidad de tu equipo para implementar/mantener mitigaciones
-3. Requisitos arquitecturales (single vs multi-domain)
-4. Cumplimiento de regulaciones (HIPAA, PCI-DSS, etc.)
+:::
 
-</div>
+---
+
+### Interpretación
+
+:::warning IMPORTANTE: La arquitectura define la mejor estrategia
+
+**Para arquitecturas multi-tenant con múltiples backends desacoplados:**
+- **Estrategia 2 lidera por 2.35 puntos** (8.6/10 vs 6.25/10)
+- La Estrategia 1 **no es práctica** para este caso de uso
+- Las cookies **no funcionan bien** entre múltiples dominios/servicios
+- **Session stores compartidos** crean puntos de fallo y acoplamiento
+
+**La Estrategia 2 es superior porque:**
+1. **Seguridad superior en multi-tenant** - Observabilidad SIEM, defense in depth, blast radius limitado, CSRF inmune
+2. **Tokens portables** - Funcionan en cualquier backend sin session stores
+3. **Validación independiente** - Cada servicio valida con claves públicas
+4. **Escalabilidad real** - Nuevas instancias no necesitan sincronización
+5. **JWT con `audience`** - Validación precisa por backend
+
+**Solo usa Estrategia 1 si:**
+- Tienes **single-domain** (no multi-tenant)
+- **NO** tienes múltiples backends
+- Regulaciones requieren **máxima seguridad** (HIPAA/PCI-DSS Level 1)
+- **Y** no puedes implementar CSP robusta
+
+:::
+
+

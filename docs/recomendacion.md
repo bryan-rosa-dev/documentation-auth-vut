@@ -4,10 +4,15 @@
 
 :::tip 🎯 Recomendación Principal
 
-**Para la mayoría de aplicaciones web modernas: Estrategia 2 (Híbrido)**
+**Para aplicaciones modernas, especialmente arquitecturas multi-tenant y con múltiples backends: Estrategia 2 (Híbrido)**
 
-**Con la condición obligatoria** de implementar Content Security Policy estricta y sanitización de inputs.
-Si tu equipo no puede garantizar mitigación XSS robusta, opta por Estrategia 1.
+Esta estrategia es **ideal** cuando:
+- ✅ Tienes arquitectura **multi-tenant** que requiere flexibilidad
+- ✅ Múltiples **backends desacoplados** necesitan validar tokens
+- ✅ Requieres **escalabilidad horizontal** sin session stores compartidos
+- ✅ Necesitas **portabilidad de tokens** entre diferentes servicios
+
+**Requisito obligatorio**: Content Security Policy estricta y sanitización de inputs.
 
 :::
 
@@ -15,27 +20,38 @@ Si tu equipo no puede garantizar mitigación XSS robusta, opta por Estrategia 1.
 
 ## Justificación Técnica
 
-### Por qué Estrategia 2 es Superior en 2025
+### Por qué Estrategia 2 es Superior para Arquitecturas Multi-Tenant y Backends Desacoplados
 
-1. **Ecosistema Web Moderno**
+1. **Arquitectura Multi-Tenant**
+   - **Aislamiento de tenants**: Cada tenant tiene su propia configuración de expiración de tokens
+   - **Tokens con `audience` específico**: El JWT integra `aud` (audience) bien definido por backend para validación precisa
+   - **Escalabilidad por tenant**: No requiere session stores compartidos entre tenants
+   - **Rotación de secretos**: Cada tenant puede rotar claves RSA independientemente
+
+2. **Múltiples Backends Desacoplados**
+   - **Validación stateless**: Cada backend valida el JWT con clave pública sin consultar DB
+   - **Sin dependencias de cookies**: Servicios en diferentes dominios pueden validar el mismo token
+   - **Portabilidad total**: Un token funciona para `api.dominio.com`, `tenant1.dominio.com`, `service.dominio.com`
+   - **Zero-trust**: Cada servicio verifica el token independientemente sin confiar en otros
+
+3. **Performance y Escalabilidad Horizontal**
+   - **Sin session store compartido**: No necesitas Redis/DB compartida entre todos los backends
+   - **CDN-friendly**: AT en header permite cachear responses fácilmente
+   - **Load balancing simple**: Cualquier instancia de cualquier backend puede validar tokens
+   - **Auto-scaling**: Nuevas instancias no necesitan sincronizar sesiones
+
+4. **Ecosistema Web Moderno (2025)**
    - Frameworks (React, Vue, Angular) sanitizan automáticamente
    - CSP es estándar en navegadores modernos
    - Herramientas de auditoría (ESLint, Snyk) detectan XSS
 
-2. **Arquitecturas Actuales**
-   - Microservicios son la norma
-   - Multi-dominio (app.com, api.com) es común
-   - Mobile + Web requieren portabilidad de tokens
-
-3. **Performance y Escalabilidad**
-   - CDNs son críticos para UX global
-   - Cookies dificultan caching
-   - AT en header permite mejor distribución
-
-4. **Ventana de Compromiso Aceptable**
-   - 15 minutos es suficientemente corto
-   - RT permanece protegido en HTTPOnly
-   - Incluso con XSS, daño es limitado
+5. **Protección XSS Robusta con Ventana de Compromiso Limitada**
+   - **Ventana de 15 minutos** limita el tiempo de exposición en caso de XSS exitoso
+   - **Content Security Policy estricta** bloquea scripts inline y `eval()`
+   - **Sanitización de inputs** con DOMPurify previene inyección de código
+   - **Frameworks modernos** escapan automáticamente contenido dinámico
+   - **RT permanece protegido** en HTTPOnly, incluso si AT es comprometido
+   - **Revocación de RT** afecta a todos los tenants/servicios instantáneamente
 
 ---
 
@@ -1030,21 +1046,38 @@ Después de implementación, monitorear:
 
 :::tip 🎯 Decisión Recomendada
 
-**Implementar Estrategia 2 (Híbrido)** con las siguientes condiciones:
+**Implementar Estrategia 2 (Híbrido)** - La elección correcta para arquitecturas multi-tenant con backends desacoplados
 
-1. ✅ Content Security Policy estricta (sin `unsafe-inline` en scripts)
-2. ✅ Sanitización de inputs con DOMPurify o equivalente
-3. ✅ Framework moderno (React 18+, Vue 3+) con auto-sanitización
-4. ✅ Access Token limitado a 15 minutos
-5. ✅ Refresh Token rotado en cada uso
-6. ✅ Logging y monitoreo de eventos de seguridad
-7. ✅ Auditorías de seguridad periódicas
+**Requisitos de implementación:**
 
-**⚠️ Migrar a Estrategia 1 si:**
+1. ✅ **JWT con `audience` bien definido** - Cada backend valida su propio `aud`
+2. ✅ **Content Security Policy estricta** - Sin `unsafe-inline` en scripts
+3. ✅ **Sanitización de inputs** con DOMPurify o equivalente
+4. ✅ **Framework moderno** (React 18+, Vue 3+) con auto-sanitización
+5. ✅ **Access Token de corta duración** - 15 minutos máximo
+6. ✅ **Refresh Token rotado** en cada uso
+7. ✅ **Logging distribuido** - Cada backend registra eventos de seguridad
+8. ✅ **Auditorías de seguridad** periódicas por tenant
 
-- Auditoría encuentra vulnerabilidades XSS no mitigables
-- Regulaciones requieren máxima seguridad
-- Equipo no puede mantener CSP y sanitización
+**🏗️ Ventajas específicas para tu arquitectura:**
+
+- **Multi-tenant**: Cada tenant valida tokens sin compartir session stores
+- **Backends desacoplados**: Validación independiente con claves públicas
+- **Escalabilidad**: Nuevas instancias validan tokens sin sincronización
+- **Zero-trust**: Cada servicio verifica autenticidad independientemente
+
+**⚠️ Solo migrar a Estrategia 1 si:**
+
+- Auditoría encuentra vulnerabilidades XSS críticas no mitigables
+- Regulaciones extremadamente estrictas (PCI-DSS Level 1, HIPAA)
+- Equipo no puede implementar/mantener CSP robusta
+- **Nota**: Esto eliminaría beneficios de multi-tenant y portabilidad de tokens
+
+**📈 Roadmap Post-Implementación**
+
+- **Mes 1-3**: Monitoreo intensivo por tenant, ajustes basados en logs
+- **Mes 3-6**: Auditoría de seguridad externa multi-tenant
+- **Mes 6+**: Evaluación de OAuth 2.1 / OIDC para federación entre tenants
 
 :::
 
