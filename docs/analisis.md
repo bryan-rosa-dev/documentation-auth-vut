@@ -174,39 +174,58 @@ sequenceDiagram
 
 </div>
 
-<div class="info-box warning">
+:::warning 🔒 Implementaciones de Seguridad (Defense in Depth)
 
-**⚠️ Vulnerabilidades y Mitigaciones**
+Esta estrategia implementa **múltiples capas de protección** para garantizar seguridad robusta:
 
-1. **XSS (Cross-Site Scripting)**:
-   - **Riesgo**: Script malicioso puede leer AT desde memoria
-   - **Impacto**: Acceso durante 15 minutos hasta expiración
-   - **Mitigaciones críticas**:
-     ```javascript
-     // ✅ Usar variables en memoria (no localStorage)
-     let accessToken = null;
+### 1. Content Security Policy (CSP)
+Bloquea ejecución de scripts no autorizados a nivel de navegador.
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self';
+```
 
-     // ✅ Content Security Policy estricta
-     Content-Security-Policy: default-src 'self'; script-src 'self'
+### 2. Almacenamiento Seguro
+```javascript
+// Private class fields - Inmune a acceso externo
+class TokenManager {
+  #accessToken = null;  // No accesible desde window.* o localStorage
+}
+```
+**+ Sanitización** de inputs (DOMPurify frontend + backend validation)
 
-     // ✅ Sanitización de inputs
-     import DOMPurify from 'dompurify';
-     const clean = DOMPurify.sanitize(userInput);
+### 3. Blast Radius Limitado
+- **AT**: Máximo 15 minutos de exposición
+- **RT**: Permanece seguro en HTTPOnly cookie
+- **Auto-recuperación**: Sistema vuelve a estado seguro tras expiración
 
-     // ✅ Evitar eval() y innerHTML
-     ```
+**¿Por qué?** Aunque un atacante bypasse CSP (muy difícil), solo obtiene acceso temporal de 15 min al AT. El RT nunca se expone.
 
-2. **Token Exposure en DevTools**:
-   - **Riesgo**: AT visible en Network/Application tabs
-   - **Mitigación**: Educación de usuarios, políticas de seguridad corporativas
+---
 
-3. **Persistencia entre Tabs**:
-   - **localStorage**: Compartido entre todas las tabs
-   - **sessionStorage**: Limitado a una tab
-   - **Memoria (variable)**: Se pierde al refrescar página
-   - **Recomendación**: Usar sessionStorage o patrón Singleton en memoria
+### Observabilidad para SIEM
 
-</div>
+**Ventaja crítica**: AT visible en logs permite monitoreo y detección de anomalías en tiempo real.
+
+```javascript
+// Detectar token usado desde IPs diferentes → Revocación automática
+if (tokenUsedFromDifferentIP(tokenId, currentIP)) {
+  revokeToken(tokenId);
+}
+```
+
+**Beneficios**: Trazabilidad completa, detección automática de patrones sospechosos, Compliance (SOC 2, ISO 27001)
+
+---
+
+### Comparación de Impacto ante XSS
+
+| Escenario | Estrategia 1 | Estrategia 2 |
+|-----------|-------------|-------------|
+| **Si XSS exitoso** | AT + RT comprometidos | Solo AT (15 min) |
+| **Daño máximo** | Acceso completo | Limitado a 15 min |
+| **Recuperación** | Requiere acción manual | Automática |
+
+:::
 
 ---
 

