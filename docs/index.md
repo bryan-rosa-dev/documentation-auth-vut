@@ -52,7 +52,7 @@ El Refresh Token se almacena en cookie HTTPOnly, mientras el Access Token se man
 **Características principales:**
 - ✅ Balance entre seguridad y flexibilidad
 - ✅ AT expira en 15 minutos (menor ventana de compromiso)
-- ⚠️ Vulnerable a XSS durante la vida del AT
+- ⚠️ Vulnerable a XSS durante la vida del AT (Se aplicaran metodologias de mitigacion)
 - ✅ Menor superficie de ataque CSRF
 
 ---
