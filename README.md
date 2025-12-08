@@ -23,29 +23,10 @@ Refresh Token en cookie HTTPOnly, Access Token en memoria del frontend (15 minut
 - **Mermaid**: Diagramas de flujo interactivos
 - **GitHub Pages**: Hosting estático
 
-## 📦 Instalación Local
-
-```bash
-# Clonar repositorio
-git clone https://github.com/tu-usuario/documentacion-auth-vut.git
-cd documentacion-auth-vut
-
-# Instalar dependencias
-npm install
-
-# Ejecutar servidor de desarrollo
-npm run docs:dev
-
-# Construir para producción
-npm run docs:build
-
-# Previsualizar build
-npm run docs:preview
-```
 
 ## 🌐 Ver Documentación
 
-La documentación está desplegada en: **[https://tu-usuario.github.io/documentacion-auth-vut/](https://tu-usuario.github.io/documentacion-auth-vut/)**
+La documentación está desplegada en: **[https://bryan-rosa-dev.github.io/documentation-auth-vut/](https://bryan-rosa-dev.github.io/documentation-auth-vut/)**
 
 ## 📂 Estructura del Proyecto
 
@@ -68,16 +49,6 @@ documentacion-auth-vut/
 └── README.md
 ```
 
-## 🎯 Características
-
-- ✅ Diagramas de flujo interactivos con Mermaid
-- ✅ Análisis de vectores de ataque (XSS, CSRF)
-- ✅ Código de ejemplo en JavaScript/Node.js
-- ✅ Tablas comparativas con badges de seguridad
-- ✅ Tooltips informativos
-- ✅ Diseño responsive
-- ✅ Modo oscuro/claro
-- ✅ Deploy automático con GitHub Actions
 
 ## 📖 Secciones Principales
 
@@ -119,33 +90,6 @@ El análisis hace énfasis especial en:
 - **Token Rotation**: Estrategias de rotación de Refresh Tokens
 - **Rate Limiting**: Protección contra fuerza bruta
 - **Logging**: Monitoreo de eventos de seguridad
-
-## 🚀 Despliegue en GitHub Pages
-
-1. **Habilitar GitHub Pages** en tu repositorio:
-   - Ve a Settings → Pages
-   - Source: GitHub Actions
-
-2. **Actualizar base en config**:
-   ```javascript
-   // docs/.vitepress/config.js
-   export default defineConfig({
-     base: '/documentacion-auth-vut/', // Tu nombre de repo
-     // ...
-   })
-   ```
-
-3. **Push a main**:
-   ```bash
-   git add .
-   git commit -m "feat: initial documentation"
-   git push origin main
-   ```
-
-4. **Verificar deploy**:
-   - Ve a Actions tab
-   - Espera a que termine el workflow
-   - Accede a `https://tu-usuario.github.io/documentacion-auth-vut/`
 
 ## 🤝 Contribuir
 
